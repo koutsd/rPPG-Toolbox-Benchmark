@@ -100,15 +100,12 @@ def unsupervised_predict(config, data_loader, method_name):
                 window_frame_size = video_frame_size
                 overlap = 0
 
-            temp_gt = []
-            temp_pred = []
-
             for i in range(0, len(BVP), window_frame_size - overlap):
                 BVP_window = BVP[i:i+window_frame_size]
                 label_window = labels_input[i:i+window_frame_size]
 
-                if len(BVP_window) < window_frame_size:
-                    # print(f"Window frame size of {len(BVP_window)} is smaller than window size of {window_frame_size}. Window ignored!")
+                if len(BVP_window) <= 15:
+                    print(f"Window frame size of {len(BVP_window)} is smaller than window size of 15. Window ignored!")
                     continue
 
                 gt_hr, pred_hr, SNR = calculate_metric_per_video(BVP_window, label_window, diff_flag=False,
@@ -117,23 +114,7 @@ def unsupervised_predict(config, data_loader, method_name):
                 predict_hr_all.append(pred_hr)
                 SNR_all.append(SNR)
                 
-            #     temp_gt.append(gt_hr)
-            #     temp_pred.append(pred_hr)
-
-            # temp_gt = np.array(temp_gt)
-            # temp_pred = np.array(temp_pred)
-            # print('GT HR: ', temp_gt)
-            # print('Predicted HR: ', temp_pred)
-            
-            # num_test_samples = len(temp_pred)
-            # RMSE = np.sqrt(np.mean(np.square(temp_pred - temp_gt)))
-            # standard_error = np.std(np.square(temp_pred - temp_gt)) / np.sqrt(num_test_samples)
-            # print("RMSE: {0} +/- {1}".format(RMSE, standard_error))
-    
     print("Used Unsupervised Method: " + method_name)
-    
-    # print("GT HR: ", gt_hr_all)
-    # print("Predict HR: ", predict_hr_all)
 
     # Filename ID to be used in any results files (e.g., Bland-Altman plots) that get saved
     if config.TOOLBOX_MODE == 'unsupervised_method':

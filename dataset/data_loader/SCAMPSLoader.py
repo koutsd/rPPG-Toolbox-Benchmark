@@ -66,57 +66,74 @@ class SCAMPSLoader(BaseLoader):
         for i in choose_range:
             data_dirs_new.append(data_dirs[i])
         return data_dirs_new
+    
 
     def preprocess_dataset_subprocess(self, data_dirs, config_preprocess, i, file_list_dict):
         """ Invoked by preprocess_dataset() for multi_process. """
         matfile_path = data_dirs[i]['path']
         saved_filename = data_dirs[i]['index']
 
-        # Read Frames
-        frames = self.read_video(matfile_path)
-        frames = (np.round(frames * 255)).astype(np.uint8)
-
+        os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
+        
         # Read Labels
         if config_preprocess.USE_PSUEDO_PPG_LABEL:
+            frames = self.read_video(matfile_path)
             bvps = self.generate_pos_psuedo_labels(frames, fs=self.config_data.FS)
         else:
-            bvps = self.read_wave(matfile_path)
+            frames, bvps = self.read_frames_wave(matfile_path)
 
-        frames_clips, bvps_clips = self.preprocess(
-            frames, bvps, config_preprocess)
+        frames_clips, bvps_clips = self.preprocess(frames, bvps, config_preprocess)
         input_name_list, label_name_list = self.save_multi_process(frames_clips, bvps_clips, saved_filename)
         file_list_dict[i] = input_name_list
 
-    def preprocess_dataset_backup(self, data_dirs, config_preprocess):
-        """Preprocesses the raw data."""
-        file_num = len(data_dirs)
-        pbar = tqdm(list(range(file_num)))
-        for i in pbar:
-            matfile_path = data_dirs[i]['path']
-            pbar.set_description("Processing %s" % matfile_path)
 
-            # Read Frames
-            frames = self.read_video(matfile_path)
+    # def preprocess_dataset(self, data_dirs, config_preprocess, begin=0, end=1):
+    #     """Preprocesses the raw data."""
+    #     file_num = len(data_dirs)
 
-            # Read Labels
-            if config_preprocess.USE_PSUEDO_PPG_LABEL:
-                bvps = self.generate_pos_psuedo_labels(frames, fs=self.config_data.FS)
-            else:
-                bvps = self.read_wave(matfile_path)
-                
-            frames_clips, bvps_clips = self.preprocess(frames, bvps, config_preprocess)
-            self.preprocessed_data_len += self.save(frames_clips, bvps_clips, data_dirs[i]['index'])
+    #     for i in tqdm(range(file_num)):
+    #         matfile_path = data_dirs[i]['path']
+
+    #         # Read Labels
+    #         if config_preprocess.USE_PSUEDO_PPG_LABEL:
+    #             frames = self.read_video(matfile_path)
+    #             bvps = self.generate_pos_psuedo_labels(frames, fs=self.config_data.FS)
+    #         else:
+    #             frames, bvps = self.read_frames_wave(matfile_path)
+                    
+    #         frames_clips, bvps_clips = self.preprocess(frames, bvps, config_preprocess)
+    #         self.preprocessed_data_len += self.save(frames_clips, bvps_clips, data_dirs[i]['index'])
+
 
     @staticmethod
     def read_video(video_file):
         """Reads a video file, returns frames(T, H, W, 3). """
         mat = mat73.loadmat(video_file)
+
         frames = mat['Xsub']  # load raw frames
-        return np.asarray(frames)
+        frames = np.asarray(frames)
+        frames = (np.round(frames * 255)).astype(np.uint8)
+        
+        return frames
 
     @staticmethod
     def read_wave(wave_file):
         """Reads a bvp signal file."""
         mat = mat73.loadmat(wave_file)
         ppg = mat['d_ppg']  # load raw frames
+        
         return np.asarray(ppg)
+
+    @staticmethod
+    def read_frames_wave(video_file):
+        """Reads a video file and a bvp signal file."""
+        mat = mat73.loadmat(video_file)
+    
+        frames = mat['Xsub']
+        frames = np.asarray(frames)
+        frames = (np.round(frames * 255)).astype(np.uint8)
+        
+        ppg = mat['d_ppg']  # load raw frames
+        ppg = np.asarray(ppg)
+        
+        return frames, ppg

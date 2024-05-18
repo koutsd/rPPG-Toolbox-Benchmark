@@ -216,6 +216,8 @@ class PhysFormerTrainer(BaseTrainer):
         if data_loader["test"] is None:
             raise ValueError("No data for test")
         
+        self.chunk_len = self.config.TEST.DATA.PREPROCESS.CHUNK_LENGTH
+
         print('')
         print("===Testing===")
         predictions = dict()
@@ -244,13 +246,24 @@ class PhysFormerTrainer(BaseTrainer):
         self.model = self.model.to(self.config.DEVICE)
         self.model.eval()
         print("Running model evaluation on the testing dataset!")
+        
+        total_time = 0
+        
         with torch.no_grad():
             for _, test_batch in enumerate(tqdm(data_loader["test"], ncols=80)):
                 batch_size = test_batch[0].shape[0]
                 data, label = test_batch[0].to(
                     self.config.DEVICE), test_batch[1].to(self.config.DEVICE)
                 gra_sharp = 2.0
+
+                starter, ender = torch.cuda.Event(enable_timing=True),   torch.cuda.Event(enable_timing=True)
+                starter.record()
+                
                 pred_ppg_test, _, _, _ = self.model(data, gra_sharp)
+                
+                ender.record()
+                torch.cuda.synchronize()
+                total_time += starter.elapsed_time(ender)/1000
                 
                 if self.config.TEST.OUTPUT_SAVE_DIR:
                     label = label.cpu()
@@ -264,7 +277,8 @@ class PhysFormerTrainer(BaseTrainer):
                         labels[subj_index] = dict()
                     predictions[subj_index][sort_index] = pred_ppg_test[idx]
                     labels[subj_index][sort_index] = label[idx]
-
+        
+        print('Throughput:', len(data_loader["test"].dataset) * self.chunk_len / total_time, 'FPS')
         print('')
         calculate_metrics(predictions, labels, self.config)
         if self.config.TEST.OUTPUT_SAVE_DIR: # saving test outputs

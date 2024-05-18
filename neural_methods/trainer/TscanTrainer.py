@@ -176,6 +176,9 @@ class TscanTrainer(BaseTrainer):
         self.model = self.model.to(self.config.DEVICE)
         self.model.eval()
         print("Running model evaluation on the testing dataset!")
+        
+        total_time = 0
+        
         with torch.no_grad():
             for _, test_batch in enumerate(tqdm(data_loader["test"], ncols=80)):
                 batch_size = test_batch[0].shape[0]
@@ -185,7 +188,15 @@ class TscanTrainer(BaseTrainer):
                 labels_test = labels_test.view(-1, 1)
                 data_test = data_test[:(N * D) // self.base_len * self.base_len]
                 labels_test = labels_test[:(N * D) // self.base_len * self.base_len]
+                
+                starter, ender = torch.cuda.Event(enable_timing=True),   torch.cuda.Event(enable_timing=True)
+                starter.record()
+                
                 pred_ppg_test = self.model(data_test)
+                
+                ender.record()
+                torch.cuda.synchronize()
+                total_time += starter.elapsed_time(ender)/1000
 
                 if self.config.TEST.OUTPUT_SAVE_DIR:
                     labels_test = labels_test.cpu()
@@ -200,6 +211,7 @@ class TscanTrainer(BaseTrainer):
                     predictions[subj_index][sort_index] = pred_ppg_test[idx * self.chunk_len:(idx + 1) * self.chunk_len]
                     labels[subj_index][sort_index] = labels_test[idx * self.chunk_len:(idx + 1) * self.chunk_len]
 
+        print('Throughput:', len(data_loader["test"].dataset) * self.chunk_len / total_time, 'FPS')
         print('')
         calculate_metrics(predictions, labels, self.config)
         if self.config.TEST.OUTPUT_SAVE_DIR: # saving test outputs

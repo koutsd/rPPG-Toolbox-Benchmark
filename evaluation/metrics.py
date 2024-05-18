@@ -64,16 +64,13 @@ def calculate_metrics(predictions, labels, config):
         else:
             window_frame_size = video_frame_size
             overlap = 0
-            
-        temp_gt = []
-        temp_pred = []
-            
+                       
         for i in range(0, len(prediction), window_frame_size - overlap):
             pred_window = prediction[i:i+window_frame_size]
             label_window = label[i:i+window_frame_size]
 
-            if len(pred_window) <= 9:
-                print(f"Window frame size of {len(pred_window)} is smaller than window size of {window_frame_size}. Window ignored!")
+            if len(pred_window) <= 15:
+                print(f"Window frame size of {len(pred_window)} is smaller than window size of 15. Window ignored!")
                 continue
 
             if config.TEST.DATA.PREPROCESS.LABEL_TYPE == "Standardized" or \
@@ -90,19 +87,6 @@ def calculate_metrics(predictions, labels, config):
             gt_hr_all.append(gt_hr)
             predict_hr_all.append(pred_hr)
             SNR_all.append(SNR)
-            
-        #     temp_gt.append(gt_hr)
-        #     temp_pred.append(pred_hr)
-            
-        # temp_gt = np.array(temp_gt)
-        # temp_pred = np.array(temp_pred)
-        # print('GT HR: ', temp_gt)
-        # print('Predicted HR: ', temp_pred)
-        
-        # num_test_samples = len(temp_pred)
-        # RMSE = np.sqrt(np.mean(np.square(temp_pred - temp_gt)))
-        # standard_error = np.std(np.square(temp_pred - temp_gt)) / np.sqrt(num_test_samples)
-        # print("RMSE: {0} +/- {1}".format(RMSE, standard_error))
     
     # Filename ID to be used in any results files (e.g., Bland-Altman plots) that get saved
     if config.TOOLBOX_MODE == 'train_and_test':
@@ -117,9 +101,6 @@ def calculate_metrics(predictions, labels, config):
     gt_hr_all = np.array(gt_hr_all)
     SNR_all = np.array(SNR_all)
     num_test_samples = len(predict_hr_all)
-    
-    # print('GT HR: ', gt_hr_all)
-    # print('Predicted HR: ', predict_hr_all)
 
     for metric in config.TEST.METRICS:
         if metric == "MAE":
